@@ -1,0 +1,6 @@
+{
+  "name": "MEDI-SORT | Smart Mobile Medical Waste Collection & Segregation System",
+  "description": "Smart Mobile Medical Waste Collection & Segregation System - Academic Prototype",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
