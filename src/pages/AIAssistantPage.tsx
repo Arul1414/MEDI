@@ -57,11 +57,40 @@ export const AIAssistantPage: React.FC = () => {
   const suggestedQuestions = [
     'How much waste was collected today?',
     'Which container is almost full?',
+    'How do I empty and reset a container?',
+    'How do I recall mobile units to storage?',
     'Show pending urgent requests',
     'What is the status of MEDI-02?',
-    'Which department generated the most waste?',
+    'Explain the color-coded waste streams',
     'Explain the AI classification review protocol',
   ];
+
+  const renderFormattedText = (content: string, isUser: boolean) => {
+    return content.split('\n').map((line, lineIdx) => {
+      const parts = line.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+      return (
+        <div key={lineIdx} className={line.trim() === '' ? 'h-2' : 'min-h-[1.25rem]'}>
+          {parts.map((part, partIdx) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+              return (
+                <strong key={partIdx} className={isUser ? 'font-bold text-white' : 'font-bold text-slate-900'}>
+                  {part.slice(2, -2)}
+                </strong>
+              );
+            }
+            if (part.startsWith('*') && part.endsWith('*')) {
+              return (
+                <em key={partIdx} className={isUser ? 'italic text-sky-100' : 'italic text-slate-600'}>
+                  {part.slice(1, -1)}
+                </em>
+              );
+            }
+            return <span key={partIdx}>{part}</span>;
+          })}
+        </div>
+      );
+    });
+  };
 
   const handleSend = async (textToSend?: string) => {
     const query = (textToSend || input).trim();
@@ -187,20 +216,20 @@ export const AIAssistantPage: React.FC = () => {
 
               {/* Message Bubble */}
               <div
-                className={`rounded-2xl p-4 text-xs leading-relaxed ${
+                className={`rounded-2xl p-4 text-sm leading-relaxed ${
                   msg.sender === 'user'
                     ? 'bg-sky-600 text-white rounded-tr-xs shadow-2xs'
                     : 'bg-slate-50 border border-slate-200 text-slate-800 rounded-tl-xs shadow-2xs'
                 }`}
               >
-                <div className="flex items-center justify-between gap-3 mb-1 text-[10px] text-slate-500 font-mono">
-                  <span className={msg.sender === 'user' ? 'text-sky-100' : 'text-slate-600 font-semibold'}>
+                <div className="flex items-center justify-between gap-3 mb-2 text-xs text-slate-500 font-mono">
+                  <span className={msg.sender === 'user' ? 'text-sky-100 font-semibold' : 'text-slate-700 font-semibold'}>
                     {msg.sender === 'user' ? currentUser.name : 'MediBot Assistant'}
                   </span>
                   <div className="flex items-center gap-2">
                     {msg.mode && (
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                        msg.sender === 'user' ? 'bg-sky-700 text-sky-100' : 'bg-slate-200 text-sky-800'
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        msg.sender === 'user' ? 'bg-sky-700 text-sky-100' : 'bg-slate-200 text-sky-900'
                       }`}>
                         {msg.mode} MODE
                       </span>
@@ -211,8 +240,8 @@ export const AIAssistantPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="whitespace-pre-line text-xs font-sans">
-                  {msg.text}
+                <div className="text-sm font-sans space-y-1">
+                  {renderFormattedText(msg.text, msg.sender === 'user')}
                 </div>
               </div>
             </div>
@@ -223,8 +252,8 @@ export const AIAssistantPage: React.FC = () => {
               <div className="w-8 h-8 rounded-xl bg-sky-600 flex items-center justify-center text-white shrink-0 animate-pulse">
                 <Bot className="w-4 h-4" />
               </div>
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl rounded-tl-xs p-4 text-xs text-slate-600 flex items-center gap-2 shadow-2xs">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-600" />
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl rounded-tl-xs p-4 text-sm text-slate-600 flex items-center gap-2 shadow-2xs">
+                <RefreshCw className="w-4 h-4 animate-spin text-sky-600" />
                 <span>MediBot is analyzing hospital telemetry records...</span>
               </div>
             </div>
@@ -235,14 +264,14 @@ export const AIAssistantPage: React.FC = () => {
 
         {/* Suggested Chips Bar */}
         <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center gap-2 overflow-x-auto no-scrollbar">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
             Suggestions:
           </span>
           {suggestedQuestions.map((q, idx) => (
             <button
               key={idx}
               onClick={() => handleSend(q)}
-              className="px-2.5 py-1 rounded-full bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-700 border border-slate-200 text-[11px] whitespace-nowrap transition-colors cursor-pointer shadow-2xs"
+              className="px-3 py-1.5 rounded-full bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-700 border border-slate-200 text-xs whitespace-nowrap transition-colors cursor-pointer shadow-2xs font-medium"
             >
               {q}
             </button>
@@ -263,12 +292,12 @@ export const AIAssistantPage: React.FC = () => {
               placeholder="Ask MediBot about collection status, container levels, urgent tickets..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500"
+              className="flex-1 px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500"
             />
             <button
               type="submit"
               disabled={!input.trim() || loading}
-              className="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-sky-600/20 transition-all cursor-pointer"
+              className="px-5 py-3 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-sm font-semibold flex items-center gap-2 shadow-md shadow-sky-600/20 transition-all cursor-pointer"
             >
               <Send className="w-4 h-4" />
               <span className="hidden sm:inline">Ask MediBot</span>

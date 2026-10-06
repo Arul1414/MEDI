@@ -147,8 +147,9 @@ export const UsersPage: React.FC = () => {
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-mono text-[11px]">
-                <th className="py-3 px-4 font-semibold">USER</th>
+                <th className="py-3 px-4 font-semibold">USER & USERNAME</th>
                 <th className="py-3 px-4 font-semibold">ROLE</th>
+                <th className="py-3 px-4 font-semibold">STATUS</th>
                 <th className="py-3 px-4 font-semibold">DEPARTMENT</th>
                 <th className="py-3 px-4 font-semibold">EMAIL</th>
                 <th className="py-3 px-4 font-semibold">LAST ACTIVE</th>
@@ -158,6 +159,7 @@ export const UsersPage: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {filteredUsers.map((user) => {
                 const isCurrent = currentUser.id === user.id;
+                const userStatus = user.status || 'ACTIVE';
                 return (
                   <tr key={user.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3 px-4">
@@ -168,22 +170,56 @@ export const UsersPage: React.FC = () => {
                           className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-2xs"
                         />
                         <div>
-                          <div className="font-bold text-slate-900 text-xs">{user.name}</div>
-                          <div className="font-mono text-[10px] text-slate-400">{user.id}</div>
+                          <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                            <span>{user.name}</span>
+                            {user.username && (
+                              <span className="font-mono text-[10px] px-1 py-0.2 bg-slate-100 text-slate-600 rounded">
+                                @{user.username}
+                              </span>
+                            )}
+                          </div>
+                          <div className="font-mono text-[10px] text-slate-400">{user.id} • {user.badgeNumber}</div>
                         </div>
                       </div>
                     </td>
                     <td className="py-3 px-4">
+                      <div className="flex flex-col gap-0.5">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase w-fit ${
+                            user.role === 'ADMIN'
+                              ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                              : user.role === 'WASTE_MANAGER'
+                              ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                              : 'bg-sky-50 text-sky-700 border border-sky-200'
+                          }`}
+                        >
+                          {user.role}
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-mono">
+                          {user.role === 'ADMIN' ? '12 Modules' : user.role === 'WASTE_MANAGER' ? '10 Modules' : '8 Modules'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
-                          user.role === 'ADMIN'
-                            ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                            : user.role === 'WASTE_MANAGER'
-                            ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                            : 'bg-sky-50 text-sky-700 border border-sky-200'
+                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold ${
+                          userStatus === 'ACTIVE' || userStatus === 'ON DUTY'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : userStatus === 'ON CALL'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-slate-100 text-slate-600 border border-slate-200'
                         }`}
                       >
-                        {user.role}
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            userStatus === 'ACTIVE' || userStatus === 'ON DUTY'
+                              ? 'bg-emerald-500 animate-pulse'
+                              : userStatus === 'ON CALL'
+                              ? 'bg-amber-500'
+                              : 'bg-slate-400'
+                          }`}
+                        />
+                        {userStatus}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-slate-800 font-medium">{user.department}</td>

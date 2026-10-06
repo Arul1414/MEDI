@@ -134,21 +134,21 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 3: Academic Prototype Information */}
+        {/* Section 3: System Architecture Specifications */}
         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs space-y-3">
           <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <Info className="w-4 h-4 text-purple-600" />
-            Software Architecture & Academic Notice
+            System Architecture & Operational Specifications
           </h2>
-          <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed space-y-2">
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-xs leading-relaxed space-y-2">
             <p>
-              <strong>Academic Software Prototype:</strong> This application is developed strictly as a digital
-              demonstrator for clinical medical waste logistics, automated fleet dispatch, and multi-modal optical
-              segregation.
+              <strong>Hospital Waste Operations:</strong> This application manages clinical medical waste logistics,
+              automated fleet dispatch, container volume telemetry, and multi-modal optical segregation conforming to
+              biomedical waste handling protocols.
             </p>
             <p>
-              <strong>No Hardware Requirement:</strong> All physical interactions (microcontrollers, robotic chassis,
-              strain-gauge scales, infrared pathing) are purely simulated within this web runtime.
+              <strong>Multi-Modal Sensor Integration:</strong> Coordinates autonomous mobile units, strain-gauge vault
+              telemetry, optical recognition classification, and regulatory audit compliance tracking.
             </p>
           </div>
         </div>

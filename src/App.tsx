@@ -4,13 +4,16 @@
  */
 
 import React, { useState } from 'react';
+import { AuthProvider } from './context/AuthContext';
 import { AppProvider, useApp } from './context/AppContext';
-import { AcademicDisclaimerBanner } from './components/common/AcademicDisclaimerBanner';
+import { LoginPage } from './components/auth/LoginPage';
+import { AccessDeniedToast, AccessDeniedFallback } from './components/common/AccessDeniedToast';
 import { DemoScenarioGuide } from './components/common/DemoScenarioGuide';
 import { GlobalSearchModal } from './components/common/GlobalSearchModal';
 import { OfficialAuditReportModal } from './components/common/OfficialAuditReportModal';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
+import { isPageAllowedForRole, PAGE_TITLES } from './types';
 
 // Page Views
 import { DashboardPage } from './pages/DashboardPage';
@@ -27,11 +30,26 @@ import { UsersPage } from './pages/UsersPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 const AppContent: React.FC = () => {
-  const { activePage } = useApp();
+  const { activePage, setActivePage, isAuthenticated, currentUser } = useApp();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
 
+  // Unauthenticated users MUST NEVER access Dashboard or internal modules directly
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
   const renderActivePage = () => {
+    // Role-based route guard
+    if (!isPageAllowedForRole(activePage, currentUser.role)) {
+      return (
+        <AccessDeniedFallback
+          onGoDashboard={() => setActivePage('dashboard')}
+          pageName={PAGE_TITLES[activePage] || activePage}
+        />
+      );
+    }
+
     switch (activePage) {
       case 'dashboard':
         return <DashboardPage />;
@@ -64,8 +82,8 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-sky-500 selection:text-white">
-      {/* Top Academic Disclaimer (Dismissible) */}
-      <AcademicDisclaimerBanner />
+      {/* Floating Access Denied Toast Notification */}
+      <AccessDeniedToast />
 
       {/* Guided Demo Walkthrough Banner */}
       <DemoScenarioGuide />
@@ -104,8 +122,11 @@ const AppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <AuthProvider>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </AuthProvider>
   );
 }
+

@@ -216,7 +216,7 @@ export const AIClassificationPage: React.FC = () => {
       <div className="bg-white border border-purple-200/80 rounded-2xl p-4 shadow-2xs">
         <div className="text-xs font-bold uppercase tracking-wider text-purple-900 mb-3 flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-purple-600" />
-          Pre-Loaded Clinical Waste Samples (Instant Academic Testing)
+          Pre-Loaded Clinical Waste Samples (Instant Testing & Verification)
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
           {SAMPLE_IMAGES.map((sample) => (

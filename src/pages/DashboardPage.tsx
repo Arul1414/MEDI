@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
+import { getVehicleTheme } from '../utils/vehicleColorUtils';
 import {
   Scale,
   CheckCircle2,
@@ -34,7 +35,7 @@ export const DashboardPage: React.FC = () => {
     (r) => r.status === 'PENDING' || r.status === 'ASSIGNED'
   ).length;
   const activeUnitsCount = mobileUnits.filter(
-    (u) => u.status === 'COLLECTING' || u.status === 'ASSIGNED' || u.status === 'RETURNING'
+    (u) => u.status === 'COLLECTING' || u.status === 'ASSIGNED' || u.status === 'EN_ROUTE' || u.status === 'RETURNING'
   ).length;
   const fullContainersCount = containers.filter((c) => c.capacityPercent >= 80).length;
   const totalAIClassifications = wasteRecords.length + 166; // simulated total verified AI runs
@@ -512,12 +513,24 @@ export const DashboardPage: React.FC = () => {
                 className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs shadow-2xs"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 flex items-center justify-center font-mono font-bold text-[11px]">
+                  <div
+                    style={{
+                      backgroundColor: `${getVehicleTheme(unit.id).primary}18`,
+                      color: getVehicleTheme(unit.id).primary,
+                      borderColor: `${getVehicleTheme(unit.id).primary}40`,
+                    }}
+                    className="w-8 h-8 rounded-lg border flex items-center justify-center font-mono font-bold text-[11px]"
+                  >
                     {unit.id.slice(-2)}
                   </div>
                   <div>
                     <div className="font-semibold text-slate-900 flex items-center gap-2">
                       <span>{unit.id}</span>
+                      <span
+                        style={{ backgroundColor: getVehicleTheme(unit.id).primary }}
+                        className="w-2 h-2 rounded-full inline-block"
+                        title={getVehicleTheme(unit.id).name}
+                      />
                       <span className="text-[10px] text-slate-500 font-normal">({unit.currentDepartment})</span>
                     </div>
                     <p className="text-[11px] text-slate-500 line-clamp-1">{unit.currentTask}</p>
@@ -528,10 +541,14 @@ export const DashboardPage: React.FC = () => {
                   <span
                     className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
                       unit.status === 'COLLECTING'
+                        ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                        : unit.status === 'EN_ROUTE'
                         ? 'bg-sky-50 text-sky-700 border border-sky-200'
                         : unit.status === 'RETURNING'
                         ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                        : 'bg-slate-100 text-slate-600 border border-slate-200'
+                        : unit.status === 'CHARGING'
+                        ? 'bg-yellow-50 text-yellow-800 border border-yellow-200'
+                        : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                     }`}
                   >
                     {unit.status}

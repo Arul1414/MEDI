@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { getPeriodAuditMetrics, AuditTimeframe } from '../utils/auditDataUtils';
 import {
   BarChart3,
   FileText,
@@ -12,32 +13,16 @@ import {
 } from 'lucide-react';
 
 export const AnalyticsPage: React.FC = () => {
-  const { wasteRecords, containers, generateAuditReport } = useApp();
+  const { wasteRecords, containers, mobileUnits, generateAuditReport, auditDateRange, setAuditDateRange } = useApp();
 
-  const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | '90d'>('7d');
+  const dateRange = (auditDateRange as AuditTimeframe) || '7d';
 
-  // Derived metrics
-  const totalWeight = wasteRecords.reduce((a, b) => a + (b.weightKg || 0), 0);
-  const avgCollectionTime = '14.2 min';
-  const aiAccuracy = '98.4%';
-  const reviewRate = '4.2%';
-  const avgContainerFill = Math.round(
-    containers.reduce((a, b) => a + b.capacityPercent, 0) / containers.length
-  );
+  const handleRangeChange = (range: AuditTimeframe) => {
+    setAuditDateRange(range);
+  };
 
-  // Department distribution
-  const deptTotals: { [key: string]: number } = {};
-  wasteRecords.forEach((r) => {
-    deptTotals[r.department] = (deptTotals[r.department] || 0) + r.weightKg;
-  });
-  const sortedDepts = Object.entries(deptTotals).sort((a, b) => b[1] - a[1]);
-  const maxDeptKg = Math.max(...sortedDepts.map((d) => d[1]), 1);
-
-  // Confidence tiers
-  const confUnder80 = wasteRecords.filter((w) => w.confidence < 0.8).length;
-  const conf80to90 = wasteRecords.filter((w) => w.confidence >= 0.8 && w.confidence < 0.9).length;
-  const confOver90 = wasteRecords.filter((w) => w.confidence >= 0.9).length;
-  const totalConf = Math.max(1, confUnder80 + conf80to90 + confOver90);
+  // Dynamic metrics derived for the selected timeframe
+  const data = getPeriodAuditMetrics(dateRange, wasteRecords, containers, mobileUnits);
 
   return (
     <div className="space-y-6 pb-12 text-slate-800">
@@ -49,7 +34,7 @@ export const AnalyticsPage: React.FC = () => {
               Intelligence & Metrics • Deep Indigo Module
             </span>
             <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-900 border border-indigo-200 text-[10px] font-mono font-semibold">
-              Telemetry Analytics Active
+              Telemetry Analytics Active • {data.timeframeLabel}
             </span>
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
@@ -57,7 +42,7 @@ export const AnalyticsPage: React.FC = () => {
             Analytics & Regulatory Audit Reports
           </h1>
           <p className="text-slate-600 text-xs mt-1">
-            Clinical waste generation volume, AI neural classifier performance, and environmental compliance matrices.
+            Clinical waste generation volume, AI neural classifier performance, and environmental compliance matrices for {data.timeframeLabel.toLowerCase()}.
           </p>
         </div>
 
@@ -66,7 +51,7 @@ export const AnalyticsPage: React.FC = () => {
             {(['today', '7d', '30d', '90d'] as const).map((range) => (
               <button
                 key={range}
-                onClick={() => setDateRange(range)}
+                onClick={() => handleRangeChange(range)}
                 className={`px-3 py-1 rounded-lg font-medium uppercase transition-colors cursor-pointer ${
                   dateRange === range
                     ? 'bg-indigo-600 text-white shadow-2xs font-bold'
@@ -80,16 +65,17 @@ export const AnalyticsPage: React.FC = () => {
 
           <button
             id="analytics-generate-audit-btn"
-            onClick={generateAuditReport}
+            onClick={() => generateAuditReport(dateRange)}
             className="px-4 py-2 rounded-xl bg-gradient-to-r from-sky-600 via-indigo-600 to-purple-600 hover:from-sky-500 hover:to-purple-500 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-indigo-600/20 transition-all cursor-pointer hover:scale-105 active:scale-95"
+            title={`Generate official regulatory audit report for ${data.timeframeLabel}`}
           >
             <FileText className="w-4 h-4 text-amber-300" />
-            <span>Generate Official Audit Report</span>
+            <span>Generate Official Audit Report ({dateRange.toUpperCase()})</span>
           </button>
         </div>
       </div>
 
-      {/* Top 5 Metric Cards with Rich Gradients */}
+      {/* Top 5 Metric Cards with Dynamic Period Data */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
         <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-50/90 to-white border border-indigo-200 shadow-2xs">
           <div className="flex items-center justify-between text-xs text-indigo-800 mb-1 font-semibold">
@@ -97,9 +83,9 @@ export const AnalyticsPage: React.FC = () => {
             <TrendingUp className="w-4 h-4 text-indigo-600" />
           </div>
           <div className="text-2xl font-bold font-mono text-slate-900">
-            {(totalWeight ?? 0).toFixed(1)} <span className="text-xs text-slate-500 font-normal">kg</span>
+            {data.totalWeightKg.toFixed(1)} <span className="text-xs text-slate-500 font-normal">kg</span>
           </div>
-          <div className="text-[11px] text-indigo-700 mt-1 font-mono font-medium">Normal clinical bounds</div>
+          <div className="text-[11px] text-indigo-700 mt-1 font-mono font-medium">{data.timeframeLabel}</div>
         </div>
 
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
@@ -107,7 +93,7 @@ export const AnalyticsPage: React.FC = () => {
             <span>Avg Pickup Time</span>
             <Clock className="w-4 h-4 text-indigo-600" />
           </div>
-          <div className="text-2xl font-bold font-mono text-indigo-600">{avgCollectionTime}</div>
+          <div className="text-2xl font-bold font-mono text-indigo-600">{data.avgPickupTimeMinutes}</div>
           <div className="text-[11px] text-slate-500 mt-1">From request to dock</div>
         </div>
 
@@ -116,7 +102,7 @@ export const AnalyticsPage: React.FC = () => {
             <span>AI Model Accuracy</span>
             <BrainCircuit className="w-4 h-4 text-purple-600" />
           </div>
-          <div className="text-2xl font-bold font-mono text-purple-600">{aiAccuracy}</div>
+          <div className="text-2xl font-bold font-mono text-purple-600">{data.aiAccuracyRate}</div>
           <div className="text-[11px] text-purple-500 mt-1">Verified via pathology</div>
         </div>
 
@@ -125,7 +111,7 @@ export const AnalyticsPage: React.FC = () => {
             <span>Human Review Rate</span>
             <AlertTriangle className="w-4 h-4 text-amber-500" />
           </div>
-          <div className="text-2xl font-bold font-mono text-amber-600">{reviewRate}</div>
+          <div className="text-2xl font-bold font-mono text-amber-600">{data.humanReviewRate}</div>
           <div className="text-[11px] text-slate-500 mt-1">Conf &lt; 80% protocol</div>
         </div>
 
@@ -134,7 +120,7 @@ export const AnalyticsPage: React.FC = () => {
             <span>Avg Vault Level</span>
             <Boxes className="w-4 h-4 text-amber-500" />
           </div>
-          <div className="text-2xl font-bold font-mono text-slate-900">{avgContainerFill}%</div>
+          <div className="text-2xl font-bold font-mono text-slate-900">{data.avgVaultFillPercent}%</div>
           <div className="text-[11px] text-slate-500 mt-1">Across 4 containers</div>
         </div>
       </div>
@@ -147,30 +133,30 @@ export const AnalyticsPage: React.FC = () => {
             <div>
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-sky-600" />
-                Waste Generation by Department (kg)
+                Waste Generation by Department (kg) • {data.timeframeLabel}
               </h2>
-              <p className="text-xs text-slate-500">Aggregated clinical ward load</p>
+              <p className="text-xs text-slate-500">Aggregated clinical ward load for the period</p>
             </div>
+            <span className="text-xs font-mono font-bold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">
+              {data.completedPickupsCount} Dispatched Pickups
+            </span>
           </div>
 
           <div className="space-y-3">
-            {sortedDepts.map(([dept, kg]) => {
-              const percent = Math.round((kg / maxDeptKg) * 100);
-              return (
-                <div key={dept} className="space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-700 font-medium">{dept}</span>
-                    <span className="font-mono text-slate-500">{(kg ?? 0).toFixed(1)} kg</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      style={{ width: `${percent}%` }}
-                      className="h-full bg-gradient-to-r from-sky-500 to-indigo-500 rounded-full"
-                    />
-                  </div>
+            {data.departments.map((dept) => (
+              <div key={dept.name} className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-700 font-medium">{dept.name}</span>
+                  <span className="font-mono text-slate-500 font-semibold">{dept.weightKg.toFixed(1)} kg</span>
                 </div>
-              );
-            })}
+                <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    style={{ width: `${dept.percent}%` }}
+                    className="h-full bg-gradient-to-r from-sky-500 to-indigo-500 rounded-full transition-all duration-500"
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -181,10 +167,13 @@ export const AnalyticsPage: React.FC = () => {
               <div>
                 <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <BrainCircuit className="w-4 h-4 text-purple-600" />
-                  AI Classification Confidence Tiers
+                  AI Classification Confidence Tiers • {data.timeframeLabel}
                 </h2>
                 <p className="text-xs text-slate-500">Neural certainty distribution against 80% safety rule</p>
               </div>
+              <span className="text-xs font-mono font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200">
+                {data.confidenceTiers.total} Neural Scans
+              </span>
             </div>
 
             <div className="space-y-4 my-auto">
@@ -192,13 +181,13 @@ export const AnalyticsPage: React.FC = () => {
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-sky-700 font-semibold">&gt; 90% High Certainty (Auto-Segregated)</span>
                   <span className="font-mono text-slate-600">
-                    {confOver90} records ({Math.round((confOver90 / totalConf) * 100)}%)
+                    {data.confidenceTiers.over90.count} records ({data.confidenceTiers.over90.percent}%)
                   </span>
                 </div>
                 <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden">
                   <div
-                    style={{ width: `${(confOver90 / totalConf) * 100}%` }}
-                    className="h-full bg-sky-500 rounded-full"
+                    style={{ width: `${data.confidenceTiers.over90.percent}%` }}
+                    className="h-full bg-sky-500 rounded-full transition-all duration-500"
                   />
                 </div>
               </div>
@@ -207,13 +196,13 @@ export const AnalyticsPage: React.FC = () => {
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-indigo-700 font-semibold">80% - 90% Moderate Certainty (Compliant)</span>
                   <span className="font-mono text-slate-600">
-                    {conf80to90} records ({Math.round((conf80to90 / totalConf) * 100)}%)
+                    {data.confidenceTiers.between80and90.count} records ({data.confidenceTiers.between80and90.percent}%)
                   </span>
                 </div>
                 <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden">
                   <div
-                    style={{ width: `${(conf80to90 / totalConf) * 100}%` }}
-                    className="h-full bg-indigo-500 rounded-full"
+                    style={{ width: `${data.confidenceTiers.between80and90.percent}%` }}
+                    className="h-full bg-indigo-500 rounded-full transition-all duration-500"
                   />
                 </div>
               </div>
@@ -222,20 +211,20 @@ export const AnalyticsPage: React.FC = () => {
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-amber-700 font-semibold">&lt; 80% Ambiguous (Human Review Mandatory)</span>
                   <span className="font-mono text-slate-600">
-                    {confUnder80} records ({Math.round((confUnder80 / totalConf) * 100)}%)
+                    {data.confidenceTiers.under80.count} records ({data.confidenceTiers.under80.percent}%)
                   </span>
                 </div>
                 <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden">
                   <div
-                    style={{ width: `${(confUnder80 / totalConf) * 100}%` }}
-                    className="h-full bg-amber-400 rounded-full"
+                    style={{ width: `${data.confidenceTiers.under80.percent}%` }}
+                    className="h-full bg-amber-400 rounded-full transition-all duration-500"
                   />
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200 text-[11px] text-amber-900 mt-4">
+          <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200 text-xs text-amber-900 mt-4">
             <strong className="text-amber-800">Safety Audit Note:</strong> Zero automated segregation occurs when confidence is below 80% or labeled UNKNOWN, fulfilling biomedical hazard protection standards.
           </div>
         </div>

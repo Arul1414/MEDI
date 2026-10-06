@@ -13,6 +13,7 @@ import {
   Maximize,
   Minimize,
   Palette,
+  LogOut,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -48,6 +49,7 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen, setSearchModalOpe
     goBack,
     canGoBack,
     generateAuditReport,
+    logout,
   } = useApp();
 
   const [notificationOpen, setNotificationOpen] = useState(false);
@@ -87,13 +89,13 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen, setSearchModalOpe
       className="h-16 bg-white border-b border-slate-200 px-3 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-30 shadow-2xs"
     >
       {/* Left section: Back button, Hamburger & Search */}
-      <div className="flex items-center gap-2 sm:gap-3 flex-1 max-w-xl">
+      <div className="flex items-center gap-2 sm:gap-2.5 flex-1 min-w-0 max-w-lg">
         {/* Universal "Back" Feature to Come Back */}
         {canGoBack && (
           <button
             id="header-back-button"
             onClick={goBack}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs border border-sky-200 transition-all cursor-pointer shrink-0"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs border border-sky-200 transition-all cursor-pointer shrink-0"
             title="Go back to previous screen"
           >
             <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
@@ -103,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen, setSearchModalOpe
 
         <button
           onClick={() => setMobileOpen(true)}
-          className="lg:hidden p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
+          className="lg:hidden p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 cursor-pointer shrink-0"
           aria-label="Open navigation menu"
         >
           <Menu className="w-5 h-5" />
@@ -112,14 +114,14 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen, setSearchModalOpe
         {/* Global Search Bar */}
         <div
           onClick={() => setSearchModalOpen(true)}
-          className="relative w-full cursor-pointer group"
+          className="relative flex-1 min-w-0 max-w-xs sm:max-w-sm cursor-pointer group"
         >
           <div className="w-full flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 group-hover:border-slate-300 text-slate-500 text-xs transition-colors">
-            <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-sky-600" />
+            <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-sky-600 shrink-0" />
             <span className="flex-1 truncate">
-              Search by Waste ID, Request, Unit, Ward...
+              Search Waste ID, Ward, Unit...
             </span>
-            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-white text-slate-500 rounded border border-slate-200">
+            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-white text-slate-500 rounded border border-slate-200 shrink-0">
               ⌘K
             </kbd>
           </div>
@@ -127,9 +129,9 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen, setSearchModalOpe
       </div>
 
       {/* Right Section: Official Audit Report, Status, Simulation Toggle, Notifications, Role */}
-      <div className="flex items-center gap-2 sm:gap-2.5">
-        {/* Module Color Signature Indicator */}
-        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 text-xs shadow-2xs">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
+        {/* Module Color Signature Indicator (visible on wide screens) */}
+        <div className="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 text-xs shadow-2xs shrink-0">
           <Palette className="w-3.5 h-3.5 text-slate-500" />
           <span className="text-[11px] text-slate-500 font-medium">Theme:</span>
           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${currentModuleTheme.badge}`}>
@@ -142,7 +144,7 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen, setSearchModalOpe
         <button
           id="fullscreen-toggle-btn"
           onClick={toggleFullScreen}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 ${
             isFullscreen
               ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
               : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
@@ -152,12 +154,12 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen, setSearchModalOpe
           {isFullscreen ? (
             <>
               <Minimize className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">Exit Fullscreen</span>
+              <span className="hidden xl:inline">Exit Fullscreen</span>
             </>
           ) : (
             <>
               <Maximize className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">Fullscreen</span>
+              <span className="hidden xl:inline">Fullscreen</span>
             </>
           )}
         </button>
@@ -166,16 +168,16 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen, setSearchModalOpe
         <button
           id="header-generate-audit-btn"
           onClick={generateAuditReport}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-600 via-indigo-600 to-purple-600 hover:from-sky-500 hover:to-purple-500 text-white font-bold text-xs shadow-md shadow-indigo-600/15 transition-all cursor-pointer shrink-0"
+          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-600 via-indigo-600 to-purple-600 hover:from-sky-500 hover:to-purple-500 text-white font-bold text-xs shadow-md shadow-indigo-600/15 transition-all cursor-pointer shrink-0"
           title="Generate Official Biomedical Audit Report Document"
         >
           <FileText className="w-3.5 h-3.5" />
-          <span className="hidden md:inline">Official Audit Report</span>
-          <span className="md:hidden">Audit</span>
+          <span className="hidden lg:inline">Official Audit Report</span>
+          <span className="lg:hidden">Audit</span>
         </button>
 
-        {/* System Status Indicator */}
-        <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-mono">
+        {/* System Status Indicator (visible on large screens) */}
+        <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-mono shrink-0">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="font-semibold tracking-wide text-[10px]">OPERATIONAL</span>
         </div>
@@ -183,7 +185,7 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen, setSearchModalOpe
         {/* Simulation Mode Toggle */}
         <button
           onClick={() => updateSettings({ simulationActive: !settings.simulationActive })}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-mono transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-mono transition-all cursor-pointer shrink-0 ${
             settings.simulationActive
               ? 'bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100'
               : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
@@ -193,22 +195,22 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen, setSearchModalOpe
           {settings.simulationActive ? (
             <>
               <Radio className="w-3.5 h-3.5 text-sky-600 animate-spin" />
-              <span className="hidden xl:inline font-semibold">SIM ON</span>
+              <span className="hidden 2xl:inline font-semibold">SIM ON</span>
             </>
           ) : (
             <>
               <Pause className="w-3.5 h-3.5 text-slate-500" />
-              <span className="hidden xl:inline">SIM OFF</span>
+              <span className="hidden 2xl:inline">SIM OFF</span>
             </>
           )}
         </button>
 
         {/* Notification Bell Dropdown */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <button
             id="notification-bell-btn"
             onClick={() => setNotificationOpen(!notificationOpen)}
-            className="relative p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="relative p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
             aria-label="View notifications"
           >
             <Bell className="w-4 h-4" />
@@ -269,7 +271,7 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen, setSearchModalOpe
                           onClick={() => markAlertRead(alert.id)}
                           className="text-sky-600 hover:text-sky-800 flex items-center gap-1 font-medium cursor-pointer"
                         >
-                          <Check className="w-3 h-3" /> Mark read
+                          <Check className="w-3.5 h-3.5" /> Mark read
                         </button>
                       )}
                     </div>
@@ -293,17 +295,38 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen, setSearchModalOpe
           )}
         </div>
 
-        {/* Current User Quick Badge */}
-        <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-200">
+        {/* Current User Quick Badge with Guaranteed Non-Clipped Layout */}
+        <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-slate-200 shrink-0">
           <img
             src={currentUser.avatar}
             alt={currentUser.name}
-            className="w-7 h-7 rounded-full object-cover border border-slate-200"
+            className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-2xs shrink-0 ring-1 ring-slate-100"
           />
-          <div className="text-left">
-            <div className="text-xs font-semibold text-slate-900 leading-none">{currentUser.name}</div>
-            <span className="text-[10px] text-sky-700 font-mono font-bold leading-tight">{currentUser.role}</span>
+          <div className="text-left hidden md:block max-w-[120px] lg:max-w-[150px]">
+            <div className="text-xs font-semibold text-slate-900 leading-none truncate" title={currentUser.name}>
+              {currentUser.name}
+            </div>
+            <span
+              className={`text-[9px] font-mono font-bold px-1 py-0.2 rounded mt-0.5 inline-block ${
+                currentUser.role === 'ADMIN'
+                  ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                  : currentUser.role === 'WASTE_MANAGER'
+                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                  : 'bg-sky-50 text-sky-700 border border-sky-200'
+              }`}
+            >
+              {currentUser.role}
+            </span>
           </div>
+          <button
+            id="header-logout-btn"
+            onClick={logout}
+            title="Sign out of MEDI-SORT"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors cursor-pointer shrink-0"
+            aria-label="Logout"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </header>

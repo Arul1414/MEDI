@@ -13,7 +13,10 @@ import {
   ContainerId,
   WasteCategory,
   RiskLevel,
+  isPageAllowedForRole,
+  PAGE_TITLES,
 } from '../types';
+import { useAuth } from './AuthContext';
 import {
   INITIAL_USERS,
   INITIAL_COLLECTION_REQUESTS,
@@ -27,6 +30,10 @@ import {
 
 interface AppContextType {
   currentUser: User;
+  username: string;
+  role: UserRole;
+  isAuthenticated: boolean;
+  accessDeniedMessage: string | null;
   users: User[];
   collectionRequests: CollectionRequest[];
   wasteRecords: WasteRecord[];
@@ -39,6 +46,7 @@ interface AppContextType {
   pageHistory: NavigationPage[];
   canGoBack: boolean;
   auditReportOpen: boolean;
+  auditDateRange: 'today' | '7d' | '30d' | '90d';
   globalSearchQuery: string;
   demoStep: number;
   demoActive: boolean;
@@ -49,8 +57,12 @@ interface AppContextType {
   setActivePage: (page: NavigationPage) => void;
   goBack: () => void;
   setAuditReportOpen: (open: boolean) => void;
-  generateAuditReport: () => void;
+  setAuditDateRange: (range: 'today' | '7d' | '30d' | '90d') => void;
+  generateAuditReport: (range?: 'today' | '7d' | '30d' | '90d') => void;
   closeAuditReport: () => void;
+  login: (username: string, password: string) => { success: boolean; error?: string };
+  logout: () => void;
+  clearAccessDeniedMessage: () => void;
   setCurrentUser: (user: User) => void;
   switchUserRole: (role: UserRole) => void;
   addUser: (user: Omit<User, 'id' | 'lastActive'>) => void;
@@ -68,6 +80,7 @@ interface AppContextType {
     notes: string;
   }) => string;
   assignMobileUnit: (requestId: string, unitId: string) => void;
+  dispatchMobileUnit: (unitId: string, requestId: string, targetDept?: string) => void;
   startCollection: (requestId: string) => void;
   markCollected: (requestId: string) => void;
   completeRequest: (requestId: string) => void;
@@ -106,8 +119,21 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const {
+    isAuthenticated,
+    currentUser,
+    username,
+    role,
+    login,
+    logout: authLogout,
+    switchRole,
+    setCurrentUser: setAuthUser,
+    accessDeniedMessage,
+    clearAccessDeniedMessage,
+    setAccessDeniedMessage,
+  } = useAuth();
+
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
-  const [currentUser, setCurrentUser] = useState<User>(INITIAL_USERS[1]); // Default to Waste Manager Marcus Brody
   const [collectionRequests, setCollectionRequests] = useState<CollectionRequest[]>(INITIAL_COLLECTION_REQUESTS);
   const [wasteRecords, setWasteRecords] = useState<WasteRecord[]>(INITIAL_WASTE_RECORDS);
   const [mobileUnits, setMobileUnits] = useState<MobileUnit[]>(INITIAL_MOBILE_UNITS);
@@ -118,49 +144,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activePage, setActivePageState] = useState<NavigationPage>('dashboard');
   const [pageHistory, setPageHistory] = useState<NavigationPage[]>([]);
   const [auditReportOpen, setAuditReportOpen] = useState(false);
+  const [auditDateRange, setAuditDateRange] = useState<'today' | '7d' | '30d' | '90d'>('7d');
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [selectedRequest, setSelectedRequest] = useState<CollectionRequest | null>(null);
   const [selectedWasteRecord, setSelectedWasteRecord] = useState<WasteRecord | null>(null);
-
-  // Navigation with history tracking
-  const setActivePage = useCallback((newPage: NavigationPage) => {
-    setActivePageState((prev) => {
-      if (prev !== newPage) {
-        setPageHistory((hist) => [...hist, prev]);
-      }
-      return newPage;
-    });
-  }, []);
-
-  const goBack = useCallback(() => {
-    if (auditReportOpen) {
-      setAuditReportOpen(false);
-      return;
-    }
-    setPageHistory((prev) => {
-      if (prev.length === 0) {
-        setActivePageState('dashboard');
-        return [];
-      }
-      const last = prev[prev.length - 1];
-      setActivePageState(last);
-      return prev.slice(0, -1);
-    });
-  }, [auditReportOpen]);
-
-  const generateAuditReport = useCallback(() => {
-    setAuditReportOpen(true);
-  }, []);
-
-  const closeAuditReport = useCallback(() => {
-    setAuditReportOpen(false);
-  }, []);
-
-  const canGoBack = pageHistory.length > 0 || auditReportOpen || activePage !== 'dashboard';
-
-  // Demo Walkthrough Mode
-  const [demoActive, setDemoActive] = useState(false);
-  const [demoStep, setDemoStep] = useState(0);
 
   // Helper to format timestamp
   const getNowFormatted = () => {
@@ -177,6 +164,87 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActivityLogs((prev) => [newLog, ...prev]);
   }, []);
 
+  // Enforce role-based page protection whenever role or activePage changes
+  useEffect(() => {
+    if (isAuthenticated && !isPageAllowedForRole(activePage, role)) {
+      const pageTitle = PAGE_TITLES[activePage] || activePage;
+      setAccessDeniedMessage(
+        `Access Denied: Your current role (${role}) does not have permission to access "${pageTitle}". Redirected to Dashboard.`
+      );
+      setActivePageState('dashboard');
+    }
+  }, [role, activePage, isAuthenticated, setAccessDeniedMessage]);
+
+  // Protected navigation with history tracking and RBAC enforcement
+  const setActivePage = useCallback((newPage: NavigationPage) => {
+    if (!isPageAllowedForRole(newPage, role)) {
+      const pageTitle = PAGE_TITLES[newPage] || newPage;
+      setAccessDeniedMessage(
+        `Access Denied: Your role (${role}) cannot access "${pageTitle}". Access is restricted under hospital security policy.`
+      );
+      addActivityLog({
+        user: currentUser.name,
+        action: 'Access Denied',
+        module: pageTitle,
+        description: `Unauthorized attempt to access "${pageTitle}" blocked for role ${role}.`,
+        status: 'ALERT',
+      });
+      setActivePageState('dashboard');
+      return;
+    }
+
+    setActivePageState((prev) => {
+      if (prev !== newPage) {
+        setPageHistory((hist) => [...hist, prev]);
+      }
+      return newPage;
+    });
+  }, [role, currentUser.name, addActivityLog, setAccessDeniedMessage]);
+
+  const goBack = useCallback(() => {
+    if (auditReportOpen) {
+      setAuditReportOpen(false);
+      return;
+    }
+    setPageHistory((prev) => {
+      if (prev.length === 0) {
+        setActivePageState('dashboard');
+        return [];
+      }
+      const last = prev[prev.length - 1];
+      if (!isPageAllowedForRole(last, role)) {
+        setActivePageState('dashboard');
+        return [];
+      }
+      setActivePageState(last);
+      return prev.slice(0, -1);
+    });
+  }, [auditReportOpen, role]);
+
+  const logout = useCallback(() => {
+    authLogout();
+    setActivePageState('dashboard');
+    setPageHistory([]);
+    setAuditReportOpen(false);
+  }, [authLogout]);
+
+  const generateAuditReport = useCallback((range?: 'today' | '7d' | '30d' | '90d') => {
+    if (range) {
+      setAuditDateRange(range);
+    }
+    setAuditReportOpen(true);
+  }, []);
+
+  const closeAuditReport = useCallback(() => {
+    setAuditReportOpen(false);
+  }, []);
+
+  const canGoBack = pageHistory.length > 0 || auditReportOpen || activePage !== 'dashboard';
+
+  // Demo Walkthrough Mode
+  const [demoActive, setDemoActive] = useState(false);
+  const [demoStep, setDemoStep] = useState(0);
+
   const addAlert = useCallback((alertData: Omit<Alert, 'id' | 'timestamp' | 'read'>) => {
     const newAlert: Alert = {
       ...alertData,
@@ -187,17 +255,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAlerts((prev) => [newAlert, ...prev]);
   }, []);
 
-  const switchUserRole = useCallback((role: UserRole) => {
-    const matchingUser = users.find((u) => u.role === role) || users[0];
-    setCurrentUser(matchingUser);
+  const switchUserRole = useCallback((newRole: UserRole) => {
+    switchRole(newRole);
+    const matchingUser = users.find((u) => u.role === newRole) || users[0];
     addActivityLog({
       user: matchingUser.name,
       action: 'Role Switched',
       module: 'Users',
-      description: `Active interface switched to ${role} (${matchingUser.name}).`,
+      description: `Active interface switched to ${newRole} (${matchingUser.name}).`,
       status: 'INFO',
     });
-  }, [users, addActivityLog]);
+  }, [switchRole, users, addActivityLog]);
+
+  const setCurrentUser = useCallback((user: User) => {
+    setAuthUser(user);
+  }, [setAuthUser]);
 
   const addUser = useCallback((userData: Omit<User, 'id' | 'lastActive'>) => {
     const newUser: User = {
@@ -214,6 +286,162 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'SUCCESS',
     });
   }, [users.length, currentUser.name, addActivityLog]);
+
+  const getDepartmentCoordinates = useCallback((dept: string): { x: number; y: number } => {
+    const d = (dept || '').toLowerCase();
+    if (d.includes('icu')) return { x: 20, y: 48 };
+    if (d.includes('emerg')) return { x: 20, y: 20 };
+    if (d.includes('ot') || d.includes('theat') || d.includes('surg')) return { x: 20, y: 75 };
+    if (d.includes('pathol') || d.includes('lab')) return { x: 50, y: 20 };
+    if (d.includes('pharm')) return { x: 50, y: 80 };
+    if (d.includes('ward a')) return { x: 80, y: 25 };
+    if (d.includes('ward b') || d.includes('general ward')) return { x: 80, y: 70 };
+    return { x: 20, y: 20 };
+  }, []);
+
+  const dispatchMobileUnit = useCallback(
+    (unitId: string, requestId: string, targetDept?: string) => {
+      const req = collectionRequests.find((r) => r.id === requestId);
+      const dept = targetDept || req?.department || 'Emergency';
+      const targetCoords = getDepartmentCoordinates(dept);
+
+      // Steps 1, 2, 3, 4, 5: Assign, status EN_ROUTE, update task, move marker toward location
+      setCollectionRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, status: 'ASSIGNED', assignedUnitId: unitId } : r))
+      );
+
+      setMobileUnits((prev) =>
+        prev.map((u) =>
+          u.id === unitId
+            ? {
+                ...u,
+                status: 'EN_ROUTE',
+                assignedRequestId: requestId,
+                currentDepartment: `${dept} Corridor`,
+                currentTask: `En route to ${dept} for collection request ${requestId}`,
+                coordinates: targetCoords,
+                targetCoordinates: targetCoords,
+                collectionProgress: 15,
+                lastActivity: getNowFormatted(),
+              }
+            : u
+        )
+      );
+
+      addActivityLog({
+        user: currentUser.name,
+        action: 'Unit Dispatched (EN_ROUTE)',
+        module: 'Mobile Units',
+        description: `${unitId} dispatched EN_ROUTE to ${dept} for request ${requestId}. Marker moving to target coordinates.`,
+        status: 'SUCCESS',
+      });
+
+      // Step 6: After reaching location, change status to COLLECTING
+      setTimeout(() => {
+        setMobileUnits((prev) =>
+          prev.map((u) =>
+            u.id === unitId
+              ? {
+                  ...u,
+                  status: 'COLLECTING',
+                  currentDepartment: dept,
+                  currentTask: `Collecting biomedical waste at ${dept} (${requestId})`,
+                  collectionProgress: 55,
+                  lastActivity: getNowFormatted(),
+                }
+              : u
+          )
+        );
+        setCollectionRequests((prev) =>
+          prev.map((r) => (r.id === requestId ? { ...r, status: 'COLLECTING' } : r))
+        );
+
+        addActivityLog({
+          user: unitId,
+          action: 'Collection Started',
+          module: 'Mobile Units',
+          description: `${unitId} reached ${dept}. Initiating optical scan & waste loading.`,
+          status: 'SUCCESS',
+        });
+
+        // Step 7: After collection, change status to RETURNING toward Central Storage
+        setTimeout(() => {
+          setMobileUnits((prev) =>
+            prev.map((u) =>
+              u.id === unitId
+                ? {
+                    ...u,
+                    status: 'RETURNING',
+                    currentDepartment: 'Central Transit Corridor',
+                    currentTask: `Returning collected payload from ${dept} to Central Storage Dock`,
+                    coordinates: { x: 50, y: 50 },
+                    targetCoordinates: { x: 50, y: 50 },
+                    collectionProgress: 95,
+                    lastActivity: getNowFormatted(),
+                  }
+                : u
+            )
+          );
+          setCollectionRequests((prev) =>
+            prev.map((r) => (r.id === requestId ? { ...r, status: 'COLLECTED', collectedAt: getNowFormatted() } : r))
+          );
+
+          addActivityLog({
+            user: unitId,
+            action: 'Returning to Base',
+            module: 'Mobile Units',
+            description: `${unitId} completed pickup at ${dept}. RETURNING to Central Storage Dock.`,
+            status: 'INFO',
+          });
+
+          // Step 8: On return, mark collection as COMPLETED and make vehicle AVAILABLE (or CHARGING if battery is low)
+          setTimeout(() => {
+            const nowTime = getNowFormatted();
+            setCollectionRequests((prev) =>
+              prev.map((r) => (r.id === requestId ? { ...r, status: 'COMPLETED', completedAt: nowTime } : r))
+            );
+
+            setMobileUnits((prev) =>
+              prev.map((u) => {
+                if (u.id !== unitId) return u;
+                const newBattery = Math.max(15, (u.batteryLevel ?? 100) - 7);
+                const needsCharge = newBattery < 28;
+                return {
+                  ...u,
+                  status: needsCharge ? 'CHARGING' : 'AVAILABLE',
+                  assignedRequestId: undefined,
+                  currentDepartment: 'Central Storage Dock',
+                  coordinates: { x: 50, y: needsCharge ? 52 : 50 },
+                  currentTask: needsCharge
+                    ? `Inductive fast-charging at Base Dock Pad (Low battery: ${newBattery}%)`
+                    : 'Docked at Central Storage Dock (Ready for dispatch)',
+                  collectionProgress: 0,
+                  batteryLevel: newBattery,
+                  lastActivity: nowTime,
+                };
+              })
+            );
+
+            addActivityLog({
+              user: unitId,
+              action: 'Task Completed',
+              module: 'Mobile Units',
+              description: `Request ${requestId} marked COMPLETED. ${unitId} returned to Central Storage Dock and marked AVAILABLE.`,
+              status: 'SUCCESS',
+            });
+          }, 3200);
+        }, 3500);
+      }, 3000);
+    },
+    [collectionRequests, currentUser.name, addActivityLog, getDepartmentCoordinates]
+  );
+
+  const assignMobileUnit = useCallback(
+    (requestId: string, unitId: string) => {
+      dispatchMobileUnit(unitId, requestId);
+    },
+    [dispatchMobileUnit]
+  );
 
   const createCollectionRequest = useCallback(
     (data: {
@@ -248,48 +476,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           type: 'HIGH PRIORITY COLLECTION',
           severity: 'WARNING',
           message: `New ${data.priority} collection request ${newId} logged from ${data.department}.`,
-          details: `Estimated ${data.estimatedQuantityKg} kg waste. Quick mobile unit dispatch recommended.`,
+          details: `Estimated ${data.estimatedQuantityKg} kg waste. Autonomous mobile unit dispatch requested.`,
           sourceModule: 'Collection Requests',
         });
       }
 
+      // Automatically dispatch an AVAILABLE vehicle if present
+      const availableUnit = mobileUnits.find((u) => u.status === 'AVAILABLE');
+      if (availableUnit) {
+        dispatchMobileUnit(availableUnit.id, newId, data.department);
+      }
+
       return newId;
     },
-    [collectionRequests.length, currentUser.name, addActivityLog, addAlert]
-  );
-
-  const assignMobileUnit = useCallback(
-    (requestId: string, unitId: string) => {
-      setCollectionRequests((prev) =>
-        prev.map((r) => (r.id === requestId ? { ...r, status: 'ASSIGNED', assignedUnitId: unitId } : r))
-      );
-
-      const targetReq = collectionRequests.find((r) => r.id === requestId);
-      const dept = targetReq?.department || 'Corridor';
-
-      setMobileUnits((prev) =>
-        prev.map((u) =>
-          u.id === unitId
-            ? {
-                ...u,
-                status: 'ASSIGNED',
-                assignedRequestId: requestId,
-                currentTask: `Assigned to request ${requestId} at ${dept}`,
-                lastActivity: getNowFormatted(),
-              }
-            : u
-        )
-      );
-
-      addActivityLog({
-        user: currentUser.name,
-        action: 'Unit Assigned',
-        module: 'Mobile Units',
-        description: `${unitId} assigned to collection request ${requestId} (${dept}).`,
-        status: 'SUCCESS',
-      });
-    },
-    [collectionRequests, currentUser.name, addActivityLog]
+    [collectionRequests.length, currentUser.name, addActivityLog, addAlert, mobileUnits, dispatchMobileUnit]
   );
 
   const startCollection = useCallback(
@@ -607,13 +807,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const chargeMobileUnit = useCallback(
     (unitId: string) => {
       setMobileUnits((prev) =>
-        prev.map((u) => (u.id === unitId ? { ...u, batteryLevel: 100, lastActivity: getNowFormatted() } : u))
+        prev.map((u) =>
+          u.id === unitId
+            ? {
+                ...u,
+                batteryLevel: 100,
+                status: 'AVAILABLE',
+                currentDepartment: 'Central Storage Dock',
+                coordinates: { x: 50, y: 50 },
+                currentTask: 'Docked at Central Storage Dock (Full Charge 100% • Ready for dispatch)',
+                lastActivity: getNowFormatted(),
+              }
+            : u
+        )
       );
       addActivityLog({
         user: currentUser.name,
         action: 'Fast Charge Initiated',
         module: 'Mobile Units',
-        description: `${unitId} battery replenished to 100% via inductive fast-charger.`,
+        description: `${unitId} battery replenished to 100% via inductive fast-charger. Status set to AVAILABLE.`,
         status: 'SUCCESS',
       });
     },
@@ -629,20 +841,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 ...u,
                 status: 'AVAILABLE',
                 assignedRequestId: undefined,
-                currentDepartment: 'Storage',
+                currentDepartment: 'Central Storage',
                 collectionProgress: 0,
-                currentTask: 'Recalled to Central Storage Base Station',
+                currentTask: 'Docked at Central Storage Base Station',
                 lastActivity: getNowFormatted(),
                 coordinates: { x: 50, y: 50 },
               }
             : u
         )
       );
+
+      setCollectionRequests((prev) =>
+        prev.map((r) =>
+          r.assignedUnitId === unitId && (r.status === 'IN_TRANSIT' || r.status === 'ASSIGNED')
+            ? {
+                ...r,
+                status: 'PENDING',
+                assignedUnitId: undefined,
+                unitName: undefined,
+              }
+            : r
+        )
+      );
+
       addActivityLog({
         user: currentUser.name,
         action: 'Unit Recalled',
         module: 'Mobile Units',
-        description: `${unitId} recalled manually to Central Storage Base Station.`,
+        description: `${unitId} recalled and docked at Central Storage Base Station (50%, 50%).`,
         status: 'INFO',
       });
     },
@@ -788,6 +1014,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider
       value={{
         currentUser,
+        username,
+        role,
+        isAuthenticated,
+        accessDeniedMessage,
         users,
         collectionRequests,
         wasteRecords,
@@ -800,6 +1030,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         pageHistory,
         canGoBack,
         auditReportOpen,
+        auditDateRange,
         globalSearchQuery,
         demoStep,
         demoActive,
@@ -808,8 +1039,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActivePage,
         goBack,
         setAuditReportOpen,
+        setAuditDateRange,
         generateAuditReport,
         closeAuditReport,
+        login,
+        logout,
+        clearAccessDeniedMessage,
         setCurrentUser,
         switchUserRole,
         addUser,
@@ -818,6 +1053,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSelectedWasteRecord,
         createCollectionRequest,
         assignMobileUnit,
+        dispatchMobileUnit,
         startCollection,
         markCollected,
         completeRequest,

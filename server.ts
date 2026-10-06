@@ -35,7 +35,23 @@ function getAIClient(): GoogleGenAI | null {
   return aiClient;
 }
 
-// Resilient helper that attempts multiple candidate models if temporary high demand (503/429) occurs
+// Timeout helper to prevent AI calls from stalling server responses
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`AI generation timed out after ${timeoutMs}ms`)), timeoutMs);
+    promise
+      .then((res) => {
+        clearTimeout(timer);
+        resolve(res);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
+// Resilient helper with fast 2800ms timeout and instant clinical fallback
 async function callGeminiWithFailover(
   ai: GoogleGenAI,
   requestConfig: {
@@ -43,35 +59,20 @@ async function callGeminiWithFailover(
     config?: any;
   }
 ) {
-  const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
-
-  for (const model of candidateModels) {
-    try {
-      const response = await ai.models.generateContent({
-        model,
+  try {
+    const response = await withTimeout(
+      ai.models.generateContent({
+        model: "gemini-3.8-flash",
         contents: requestConfig.contents,
         config: requestConfig.config,
-      });
-      if (response && response.text) {
-        return response;
-      }
-    } catch (err: any) {
-      const msg = err?.message || String(err);
-      const isTransient =
-        msg.includes("503") ||
-        msg.includes("demand") ||
-        msg.includes("429") ||
-        msg.includes("RESOURCE_EXHAUSTED") ||
-        msg.includes("UNAVAILABLE") ||
-        msg.includes("overloaded");
-
-      if (isTransient) {
-        console.log(`[AI Failover] Model ${model} is currently experiencing high demand. Trying alternate candidate...`);
-        continue;
-      }
-      console.log(`[AI Info] Model ${model} encountered notice: ${msg.slice(0, 100)}`);
-      break;
+      }),
+      2800
+    );
+    if (response && response.text) {
+      return response;
     }
+  } catch (err: any) {
+    console.log(`[AI Info] Gemini notice: ${(err?.message || String(err)).slice(0, 100)}`);
   }
   return null;
 }
@@ -260,21 +261,27 @@ Context data: ${JSON.stringify(context || {})}`;
   const urgentRequests = context?.urgentRequests || [];
   const topDept = context?.topDepartment || "Emergency";
 
-  if (q.includes("today") || q.includes("summary") || q.includes("how much waste")) {
+  if (q.includes("today") || q.includes("summary") || q.includes("how much waste") || q.includes("collected")) {
     reply = `**Today's Hospital Waste Summary:**\n- **Total Waste Collected:** ${totalWaste} kg\n- **Completed Collections:** ${todayCollections} pickups\n- **Pending Requests:** ${pendingRequests} awaiting dispatch\n- **Active Mobile Units:** ${activeUnits} operational in corridors\n- **Critical/Full Containers:** ${fullContainers} requiring decanting`;
-  } else if (q.includes("container") || q.includes("full") || q.includes("capacity")) {
+  } else if (q.includes("empty") || q.includes("reset") || q.includes("decant")) {
+    reply = `**Container Decanting & Reset Instructions:**\n1. Navigate to the **Segregation Center** page.\n2. Click the **Empty & Reset** button on any container card (General, Infectious Soft, Sharps, Pharmaceutical).\n3. The container immediately resets to **0.0 kg (0% capacity)** and logs an immutable biohazard disposal manifest.\n4. You can also use **Reset All Vaults** in the simulation controls.`;
+  } else if (q.includes("recall") || q.includes("storage") || q.includes("dock") || q.includes("base station")) {
+    reply = `**Mobile Unit Fleet Recall Protocol:**\n1. Navigate to the **Mobile Units** page.\n2. Select any active unit on the interactive SVG map or fleet grid.\n3. Click **Recall to Storage**.\n4. The unit will cancel active transit, set status to **AVAILABLE**, and dock at Central Storage Base Station coordinates (50%, 50%).`;
+  } else if (q.includes("container") || q.includes("full") || q.includes("capacity") || q.includes("vault")) {
     const list = containers.map((c: any) => `• **${c.name} (${c.label})**: ${c.capacityPercent}% (${c.currentWeightKg}kg / ${c.capacityKg}kg) - Status: **${c.status}**`).join("\n");
     reply = `**Current Virtual Container Levels:**\n${list || "Containers monitored at normal capacity."}\n\nContainers at ≥80% trigger amber alerts, and ≥95% trigger emergency dispatch lockout.`;
   } else if (q.includes("urgent") || q.includes("pending") || q.includes("request")) {
     reply = `**Urgent & Pending Collection Requests:**\nCurrently **${pendingRequests}** pending requests logged.\n• Emergency Ward: CR-1024 (Urgent, Sharps waste, 4.5kg)\n• ICU Room 4: CR-1028 (High, Infectious Soft, 8.2kg)\n• Operation Theatre 2: CR-1031 (High, Surgical packs, 6.0kg)`;
-  } else if (q.includes("medi-02") || q.includes("unit 2")) {
-    reply = `**Mobile Unit MEDI-02 Status:**\n- **Status:** COLLECTING\n- **Current Location:** Ward B (Corridor 3)\n- **Assigned Request:** CR-1025\n- **Simulated Battery:** 78%\n- **Progress:** 65% completed\n- **Last Communication:** < 30 seconds ago`;
+  } else if (q.includes("medi-02") || q.includes("unit 2") || q.includes("unit status") || q.includes("fleet")) {
+    reply = `**Mobile Fleet Overview:**\n- **Active Operational Fleet:** ${activeUnits} units online.\n- **Base Docking Station:** Central Storage (x: 50%, y: 50%).\n- **MEDI-01:** Docked & fully charged (100%), available for rapid dispatch.\n- **MEDI-02:** Tracking Ward B corridor route (Battery: 78%).\n- **MEDI-03:** Servicing ICU complex pickup (Battery: 65%).\n- **MEDI-04:** Returning to Central Storage with 6.8 kg payload.`;
   } else if (q.includes("department") || q.includes("most waste")) {
     reply = `**Departmental Waste Generation:**\n**${topDept}** has generated the highest volume of medical waste today (${Math.round(totalWaste * 0.38)} kg), followed closely by **ICU** (${Math.round(totalWaste * 0.28)} kg) and **Operation Theatre** (${Math.round(totalWaste * 0.22)} kg).`;
   } else if (q.includes("review") || q.includes("human review") || q.includes("confidence")) {
     reply = `**AI Classification Review Metrics:**\n- Safety Confidence Threshold: **80%**\n- Human-Review Required Rate: **7.2%**\n- Any detection below 80% or classified as UNKNOWN automatically locks auto-segregation and requires manual waste manager verification.`;
+  } else if (q.includes("sharps") || q.includes("infectious") || q.includes("category") || q.includes("color")) {
+    reply = `**Biomedical Waste Segregation Streams:**\n- **Yellow / Container B (Infectious Soft):** Soiled dressings, blood-soaked swabs, biological liners.\n- **Red / Container C (Sharps Hazard):** Needles, scalpels, surgical blades, broken vials.\n- **Blue-White / Container D (Pharmaceutical):** Expired pharmaceuticals, chemotherapy ampoules, antibiotic vials.\n- **Black / Container A (General Refuse):** Non-contaminated packaging, food wrappers, clean paper waste.`;
   } else {
-    reply = `I am **MediBot**, the clinical waste intelligence assistant. Based on current system metrics:\n- Hospital waste collection is **OPERATIONAL**\n- ${activeUnits} mobile collection units are currently tracking hospital routes\n- System has processed ${context?.aiClassificationsCount ?? 186} classifications with safety verification protocols active.\n\nYou can ask about container capacities, urgent requests, mobile unit statuses, or daily totals!`;
+    reply = `I am **MediBot**, the clinical waste intelligence assistant. Based on current system metrics:\n- Hospital waste collection is **OPERATIONAL**\n- ${activeUnits} mobile collection units are currently tracking hospital routes\n- System has processed ${context?.aiClassificationsCount ?? 186} classifications with safety verification protocols active.\n\nYou can ask about container capacities, urgent requests, mobile unit statuses, decanting, or daily totals!`;
   }
 
   return res.json({

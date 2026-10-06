@@ -39,7 +39,7 @@ export const DemoScenarioGuide: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs uppercase font-bold tracking-wider text-violet-700">
-                Academic Demonstration Mode • Step {demoStep} of {DEMO_STEPS.length}
+                Interactive Demonstration Mode • Step {demoStep} of {DEMO_STEPS.length}
               </span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-violet-200/70 text-violet-800 border border-violet-300">
                 {progressPercent}% Completed

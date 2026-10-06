@@ -2,6 +2,7 @@ export type UserRole = 'ADMIN' | 'WASTE_MANAGER' | 'STAFF';
 
 export interface User {
   id: string;
+  username?: string;
   name: string;
   email: string;
   role: UserRole;
@@ -9,6 +10,7 @@ export interface User {
   avatar: string;
   badgeNumber: string;
   lastActive: string;
+  status?: 'ACTIVE' | 'ON DUTY' | 'ON CALL' | 'OFF DUTY';
 }
 
 export type WasteCategory =
@@ -71,14 +73,17 @@ export interface CollectionRequest {
 export type MobileUnitStatus =
   | 'AVAILABLE'
   | 'ASSIGNED'
+  | 'EN_ROUTE'
   | 'COLLECTING'
   | 'RETURNING'
+  | 'CHARGING'
   | 'MAINTENANCE'
   | 'OFFLINE';
 
 export interface MobileUnit {
   id: string; // e.g. "MEDI-01"
   name: string;
+  color?: string;
   status: MobileUnitStatus;
   assignedRequestId?: string;
   currentDepartment: string;
@@ -87,6 +92,7 @@ export interface MobileUnit {
   currentTask: string;
   lastActivity: string;
   speedMps: number;
+  payloadCapacityKg?: number;
   coordinates: { x: number; y: number }; // Relative position on map (0-100%)
   targetCoordinates?: { x: number; y: number };
 }
@@ -177,3 +183,61 @@ export type NavigationPage =
   | 'assistant'
   | 'users'
   | 'settings';
+
+export const ROLE_PERMITTED_PAGES: Record<UserRole, NavigationPage[]> = {
+  ADMIN: [
+    'dashboard',
+    'requests',
+    'ai-classification',
+    'segregation',
+    'mobile-units',
+    'inventory',
+    'alerts',
+    'analytics',
+    'logs',
+    'assistant',
+    'users',
+    'settings',
+  ],
+  WASTE_MANAGER: [
+    'dashboard',
+    'requests',
+    'ai-classification',
+    'segregation',
+    'mobile-units',
+    'inventory',
+    'alerts',
+    'analytics',
+    'logs',
+    'assistant',
+  ],
+  STAFF: [
+    'dashboard',
+    'requests',
+    'ai-classification',
+    'segregation',
+    'mobile-units',
+    'inventory',
+    'alerts',
+    'assistant',
+  ],
+};
+
+export const PAGE_TITLES: Record<NavigationPage, string> = {
+  dashboard: 'Dashboard',
+  requests: 'Collection Requests',
+  'ai-classification': 'AI Waste Classification',
+  segregation: 'Segregation Center',
+  'mobile-units': 'Mobile Units',
+  inventory: 'Waste Inventory',
+  alerts: 'Alerts',
+  analytics: 'Analytics & Reports',
+  logs: 'Activity Logs',
+  assistant: 'AI Assistant',
+  users: 'Users',
+  settings: 'Settings',
+};
+
+export const isPageAllowedForRole = (page: NavigationPage, role: UserRole): boolean => {
+  return ROLE_PERMITTED_PAGES[role]?.includes(page) ?? false;
+};
