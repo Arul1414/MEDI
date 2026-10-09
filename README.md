@@ -11,7 +11,7 @@
 <br>
 
 🔗 **LIVE DEMO**
-👉 `YOUR_LIVE_URL_HERE`
+👉 https://medi-one-zeta.vercel.app/
 
 <br>
 
@@ -380,7 +380,7 @@ A single platform demonstrating the complete digital lifecycle of medical-waste 
 
 <br>
 
-**🔗 Live Demo:** `YOUR_LIVE_URL_HERE`
+**🔗 Live Demo:** https://medi-one-zeta.vercel.app/
 
 **💻 Built with ❤️ using React + TypeScript + Gemini AI**
 
